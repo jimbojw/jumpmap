@@ -142,9 +142,9 @@ for (var i = 2, leni = process.argv.length; i < leni; i++) {
 //-----------------------------------------------------------------
         if (good || securityClass === 'null') {
           ret.push({
-            x: x,
-            y: y,
-            z: z,
+            x: +x,
+            y: +y,
+            z: +z,
             security: security,
             securityClass: securityClass,
             name: name

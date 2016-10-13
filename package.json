@@ -1,0 +1,22 @@
+{
+  "name": "jumpmap",
+  "version": "0.1.0",
+  "description": "Interactive visualizaton of EVE jump locations.",
+  "main": "index.js",
+  "scripts": {
+    "devserver": "http-server ./web",
+    "process": "> ./data/evesystems.ldj ; find ./data/sde/fsd/universe/eve -name 'solarsystem.staticdata' | grep -iv 'uua-f4' | grep -iv 'a821-a' | grep -iv 'j7hz-f' | xargs node ./maptool/process.js >> ./data/evesystems.ldj",
+    "process2": "node ./maptool/process2.js ./data/evesystems.ldj > ./web/eve.json",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/walkingeyerobot/jumpmap.git"
+  },
+  "bugs": {
+    "url": "https://github.com/walkingeyerobot/jumpmap/issues"
+  },
+  "devDependencies": {
+    "http-server": "0.9.0"
+  }
+}
