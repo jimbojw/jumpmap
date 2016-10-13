@@ -1,11 +1,18 @@
 var fs = require('fs');
 var bigInt = require('big-integer');
 var data, nodes = [], nodes2 = [], edges = [], seven2 = bigInt("4.3864129e+33");
-fs.readFile('/home/mitch/evesystems.json', 'utf-8', function(err, rawdata) {
+
+const filename = process.argv[2];
+
+if (!filename) {
+  throw Error('No filename provided');
+}
+
+fs.readFile(filename, 'utf-8', function(err, rawdata) {
   if (err) {
     throw err;
   }
-  data = JSON.parse(rawdata);
+  data = rawdata.split('\n').filter(line => /\S/.test(line)).map(JSON.parse);
   makeNodes();
   makeEdges();
   cleanNodes();
@@ -44,12 +51,12 @@ function makeEdges() {
       if (jnode.group !== 0) {
         continue;
       }
-      var ix = bigInt(idata.x.replace(/\.0$/, '')),
-          iy = bigInt(idata.y.replace(/\.0$/, '')),
-          iz = bigInt(idata.z.replace(/\.0$/, '')),
-          jx = bigInt(jdata.x.replace(/\.0$/, '')),
-          jy = bigInt(jdata.y.replace(/\.0$/, '')),
-          jz = bigInt(jdata.z.replace(/\.0$/, '')),
+      var ix = bigInt(idata.x),
+          iy = bigInt(idata.y),
+          iz = bigInt(idata.z),
+          jx = bigInt(jdata.x),
+          jy = bigInt(jdata.y),
+          jz = bigInt(jdata.z),
           dx = ix.subtract(jx),
           dy = iy.subtract(jy),
           dz = iz.subtract(jz),
