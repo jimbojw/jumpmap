@@ -49,54 +49,7 @@ for (var i = 2, leni = process.argv.length; i < leni; i++) {
         throw msg;
       }
 
-/*
-      if (name === 'Arifsdald') {
-        var typeIds = [];
-        var good = false;
-        var stationMatches = data.match(/\n( *)npcStations:([^\t]*)/m);
-        while (stationMatches) {
-          var shouldBreak = false;
-          var spaces = stationMatches[1].length;
-          var newData = stationMatches[2];
-          var spacesRegexp = new RegExp('([^\t]*?[^ ]) {' + spaces + '}[^ ]');
-          var newDataMatches = newData.match(spacesRegexp);
-          if (!newDataMatches) {
-            console.error('something is wrong maybe');
-            break;
-          }
-          var typeIdMatches = newDataMatches[1].match(/^ *typeID: (\d+)$/gm);
-          if (!typeIdMatches) {
-            console.error('something is wrong maybe?');
-            break;
-          }
-
-          for (var j = 0, lenj = typeIdMatches.length; j < lenj; j++) {
-            var typeIdMatchesMatches = typeIdMatches[j].match(/^ *typeID: (\d+)$/);
-            if (!typeIdMatchesMatches) {
-              console.error('something is wrong maybe.');
-              shouldBreak = true;
-              break;
-            }
-            var typeId = parseInt(typeIdMatchesMatches[1], 10);
-            if (green.indexOf(typeId) !== -1 || yellow.indexOf(typeId) !== -1) {
-              good = true;
-              break;
-            } else if (red.indexOf(typeId) === -1) {
-              console.error('station with typeid ' + typeId + ' not found.');
-            }
-          }
-          if (shouldBreak || good) {
-            break;
-          }
-          stationMatches = newData.match(/\n( *)npcStations:([^\t]*)/m);
-        }
-        console.error(good);
-      }
-*/
-
-      // console.log(x, y, z, security, securityClass, name);
       if (securityClass !== 'high') {
-//-----------------------------------------------------------------
         if (securityClass === 'low') {
           var typeIds = [];
           var good = false;
@@ -139,7 +92,6 @@ for (var i = 2, leni = process.argv.length; i < leni; i++) {
           }
         }
 
-//-----------------------------------------------------------------
         if (good || securityClass === 'null') {
           ret.push({
             x: +x,
