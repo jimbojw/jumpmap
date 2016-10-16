@@ -20,6 +20,13 @@ for (var i = 2, leni = process.argv.length; i < leni; i++) {
         throw 'no name.';
       }
 
+      var regionMatches = process.argv[ii].match(/\/eve\/([^\/]+)\//);
+      if (regionMatches) {
+        var region = regionMatches[1];
+      } else {
+        throw 'no region.';
+      }
+
       var centerMatches =
         data.match(/center:\s+- (-?[\d\.\+e]+)\s+- (-?[\d\.\+e]+)\s+- (-?[\d\.\+e]+)\s/m);
       if (centerMatches) {
@@ -50,56 +57,60 @@ for (var i = 2, leni = process.argv.length; i < leni; i++) {
       }
 
       if (securityClass !== 'high') {
-        if (securityClass === 'low') {
-          var typeIds = [];
-          var good = false;
-          var stationMatches = data.match(/\n( *)npcStations:([^\t]*)/m);
-          while (stationMatches) {
-            var shouldBreak = false;
-            var spaces = stationMatches[1].length;
-            var newData = stationMatches[2];
-            var spacesRegexp = new RegExp('([^\t]*?[^ ]) {' + spaces + '}[^ ]');
-            var newDataMatches = newData.match(spacesRegexp);
-            if (!newDataMatches) {
-              console.error('something is wrong maybe');
-              break;
-            }
-            var typeIdMatches = newDataMatches[1].match(/^ *typeID: (\d+)$/gm);
-            if (!typeIdMatches) {
-              console.error('something is wrong maybe?');
-              break;
-            }
-            
-            for (var j = 0, lenj = typeIdMatches.length; j < lenj; j++) {
-              var typeIdMatchesMatches = typeIdMatches[j].match(/^ *typeID: (\d+)$/);
-              if (!typeIdMatchesMatches) {
-                console.error('something is wrong maybe.');
-                shouldBreak = true;
-                break;
-              }
-              var typeId = parseInt(typeIdMatchesMatches[1], 10);
-              if (green.indexOf(typeId) !== -1) {
-                good = true;
-                break;
-              } else if (yellow.indexOf(typeId) === -1 && red.indexOf(typeId) === -1) {
-                console.error('station with typeid ' + typeId + ' not found.');
-              }
-            }
-            if (shouldBreak || good) {
-              break;
-            }
-            stationMatches = newData.match(/\n( *)npcStations:([^\t]*)/m);
+        var typeIds = [];
+        var stationMatches = data.match(/\n( *)npcStations:([^\t]*)/m);
+        var stationRating = 0;
+        while (stationMatches) {
+          var shouldBreak = false;
+          var spaces = stationMatches[1].length;
+          var newData = stationMatches[2];
+          var spacesRegexp = new RegExp('([^\t]*?[^ ]) {' + spaces + '}[^ ]');
+          var newDataMatches = newData.match(spacesRegexp);
+          if (!newDataMatches) {
+            console.error('something is wrong maybe');
+            break;
           }
+          var typeIdMatches = newDataMatches[1].match(/^ *typeID: (\d+)$/gm);
+          if (!typeIdMatches) {
+            console.error('something is wrong maybe?');
+            break;
+          }
+            
+          for (var j = 0, lenj = typeIdMatches.length; j < lenj; j++) {
+            var typeIdMatchesMatches = typeIdMatches[j].match(/^ *typeID: (\d+)$/);
+            if (!typeIdMatchesMatches) {
+              console.error('something is wrong maybe.');
+              shouldBreak = true;
+              break;
+            }
+            var typeId = parseInt(typeIdMatchesMatches[1], 10);
+            if (green.indexOf(typeId) !== -1) {
+              stationRating = 3;
+              break;
+            } else if (yellow.indexOf(typeId) !== -1) {
+              stationRating = 2;
+            } else if (red.indexOf(typeId) === -1 && stationRating < 2) {
+              stationRating = 1;
+            } else if (green.indexOf(typeId) === -1 && yellow.indexOf(typeId) === -1 && red.indexOf(typeId) === -1) {
+              console.error('station with typeid ' + typeId + ' not found.');
+            }
+          }
+          if (shouldBreak || stationRating === 3) {
+            break;
+          }
+          stationMatches = newData.match(/\n( *)npcStations:([^\t]*)/m);
         }
 
-        if (good || securityClass === 'null') {
+        if (!(stationRating === 0 && securityClass === 'low')) {
           ret.push({
             x: +x,
             y: +y,
             z: +z,
             security: security,
             securityClass: securityClass,
-            name: name
+            name: name,
+            region: region,
+            stationRating: stationRating
           });
         }
       }

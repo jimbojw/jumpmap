@@ -24,6 +24,8 @@ function parseDataIntoSystems(rawdata) {
     const system = JSON.parse(line);
     if (system.name in systems) {
       throw Error(`Duplicate system name: ${system.name}`);
+    } else if (system.securityClass === 'low' && system.stationRating < 3) {
+      continue;
     }
     systems[system.name] = system;
   }
