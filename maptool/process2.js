@@ -1,99 +1,338 @@
-var fs = require('fs');
-var bigInt = require('big-integer');
-var data, nodes = [], nodes2 = [], edges = [], seven2 = bigInt("4.3864129e+33");
+'use strict';
 
+const fs = require('fs');
 const filename = process.argv[2];
 
 if (!filename) {
   throw Error('No filename provided');
 }
 
-fs.readFile(filename, 'utf-8', function(err, rawdata) {
+const seven = 6.622512e+16;  // 7 lightyears in meters.
+const seven2 = seven * seven;
+
+/**
+ * Given the raw input data, create a hash of all systems.
+ */
+function parseDataIntoSystems(rawdata) {
+  const systems = {};
+  const lines = rawdata.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!/\S/.test(line)) {
+      continue;
+    }
+    const system = JSON.parse(line);
+    if (system.name in systems) {
+      throw Error(`Duplicate system name: ${system.name}`);
+    }
+    systems[system.name] = system;
+  }
+  return systems;
+}
+
+/**
+ * Given a system, return a key for looking it up in the grid.
+ */
+function getKey(system) {
+  return [
+    Math.floor(system.x / seven),
+    Math.floor(system.y / seven),
+    Math.floor(system.z / seven),
+  ];
+}
+
+/**
+ * Given the systems hash, construct a grid of regions.
+ */
+function constructGrid(systems) {
+  const grid = {};
+
+  for (let name in systems) {
+    const system = systems[name];
+
+    if (!(system.securityClass in grid)) {
+      grid[system.securityClass] = {};
+    }
+    const regions = grid[system.securityClass];
+
+    const key = getKey(system);
+    if (!(key in regions)) {
+      regions[key] = {key, systems: {}};
+    }
+    regions[key].systems[system.name] = system;
+  }
+
+  computeSearchRegions(grid);
+
+  return grid;
+}
+
+/**
+ * Given a grid of low and null security space regions, for each region
+ * containing any low security spaces, find the neighboring regions to search
+ * for nulls.
+ */
+function computeSearchRegions(grid) {
+  for (let key in grid.low) {
+    const region = grid.low[key];
+    region.searchRegions = {};
+
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const otherKey = [
+            region.key[0] + dx,
+            region.key[1] + dy,
+            region.key[2] + dz
+          ];
+          if (otherKey in grid.null) {
+            region.searchRegions[otherKey] = grid.null[otherKey];
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Given a grid, find the jumpable links between low-sec to null-sec spaces.
+ */
+function findLinks(grid) {
+  const links = {low:{}, null: {}};
+
+  for (let regionKey in grid.low) {
+    const region = grid.low[regionKey];
+    for (let systemName in region.systems) {
+      const system = region.systems[systemName];
+      for (let searchRegionKey in region.searchRegions) {
+        const searchRegion = region.searchRegions[searchRegionKey];
+        for (let targetName in searchRegion.systems) {
+          const target = searchRegion.systems[targetName];
+          const dx = target.x - system.x;
+          const dy = target.y - system.y;
+          const dz = target.z - system.z;
+          if (dx * dx + dy * dy + dz * dz < seven2) {
+            if (!(systemName in links.low)) {
+              links.low[systemName] = {from: system, to: {}, count: 0};
+            }
+            links.low[systemName].to[targetName] = target;
+            links.low[systemName].count++;
+
+            if (!(targetName in links.null)) {
+              links.null[targetName] = {to: target, from: {}, count: 0}; 
+            }
+            links.null[targetName].from[systemName] = system;
+            links.null[targetName].count++;
+          }
+        }
+      }
+    }
+  }
+
+  return links;
+}
+
+/**
+ * Given the links between spaces, and the name of a low-sec system, find all
+ * of the neighboring low-sec spaces that can jump only to a subset of the
+ * nulls that this system can jump to.
+ */
+function findRedundantNeighbors(links, systemName) {
+  const {from: system, to: targets, count} = links.low[systemName];
+
+  // First, find the neighboring systems that may be redundant.
+  const candidateNeighbors = {};
+  for (let targetName in targets) {
+    const {from: neighbors} = links.null[targetName];
+    for (let neighborName in neighbors) {
+      if (neighborName === systemName || neighborName in candidateNeighbors) {
+        continue;
+      }
+      const {from: neighbor, to: neighborTargets, count: neighborCount} =
+          links.low[neighborName];
+      if (neighborCount <= count) {
+        candidateNeighbors[neighborName] = neighbor;
+      }
+    }
+  }
+
+  // Now, search through the candidates for the redundancies.
+  const redundantNeighbors = {};
+  for (let neighborName in candidateNeighbors) {
+    const {from: neighbor, to: neighborTargets} = links.low[neighborName];
+    let isRedundant = true;
+    for (let neighborTargetName in neighborTargets) {
+      if (!(neighborTargetName in targets)) {
+        // Can't be redundant, since it links to something this system doesn't.
+        isRedundant = false;
+        break;
+      }
+    }
+    if (isRedundant) {
+      redundantNeighbors[neighborName] = neighbor;
+    }
+  }
+
+  return redundantNeighbors;
+}
+
+/**
+ * Given the links between spaces, group similar low-sec systems together.
+ * A group consists of two kinds of systems: main and redundant. The main
+ * systems in each group can all link to all the nulls for that group. There
+ * will always be at least one main system in a group.
+ *
+ * The redundant systems have partial coverage of the nulls covered by the
+ * group. There may be no redundant systems.
+ */
+function createSystemGroups(links) {
+  // Keep track of which systems have been made fully redundant.
+  const redundantSystems = {};
+
+  const candidateGroups = {};
+  for (let systemName in links.low) {
+    const {from: system, to: targets, count} = links.low[systemName];
+    const group = candidateGroups[systemName] = {
+      main: {},
+      redundant: {},
+      targets,
+      count
+    };
+    group.main[systemName] = system;
+
+    const redundantNeighbors = findRedundantNeighbors(links, systemName);
+    for (let neighborName in redundantNeighbors) {
+      const {from: neighbor, count: neighborCount} = links.low[neighborName];
+      if (neighborCount === count) {
+        group.main[neighborName] = neighbor;
+      } else {
+        group.redundant[neighborName] = neighbor;
+        redundantSystems[neighborName] = neighbor;
+      }
+    }
+  }
+
+  // Remove any groups which have been made fully redundant.
+  for (let redundantName in redundantSystems) {
+    delete candidateGroups[redundantName];
+  }
+
+  // Combine cycles (groups with shared multiple main systems).
+  const groups = {};
+  for (let systemName in candidateGroups) {
+    const groupName =
+        Object.keys(candidateGroups[systemName].main).sort().join(',');
+    groups[groupName] = candidateGroups[systemName];
+  }
+
+  return groups;
+}
+
+/**
+ * Given the determined low-sec system groups, combine any null-sec systems
+ * into groups when they have the same low-sec system group coverage. That is,
+ * if multiple null-sec systems are all covered by the exact same set of
+ * low-sec groups, combine them into one null-sec group.
+ */
+function combineTargetGroups(systemGroups) {
+  // First, for each target (null-sec group), determine which low-sec groups
+  // can reach it.
+  const linkedGroups = {};
+  for (let groupName in systemGroups) {
+    const {main, targets} = systemGroups[groupName];
+    for (let targetName in targets) {
+      if (!(targetName in linkedGroups)) {
+        linkedGroups[targetName] = {target: targets[targetName], groups: {}};
+      }
+      linkedGroups[targetName].groups[groupName] = main;
+    }
+  }
+
+  // Now, map the combination of reachable groups to all the targets.
+  const combinableTargets = {};
+  for (let targetName in linkedGroups) {
+    const {target, groups} = linkedGroups[targetName];
+    const combinedGroupNames = Object.keys(groups).sort().join(';');
+    if (!(combinedGroupNames in combinableTargets)) {
+      combinableTargets[combinedGroupNames] = {groups, targets: {}};
+    }
+    combinableTargets[combinedGroupNames].targets[targetName] = target;
+  }
+
+  // Lastly, use the groups of targets to create a lookup map.
+  const targetGroups = {};
+  for (let combinedGroupNames in combinableTargets) {
+    const {targets} = combinableTargets[combinedGroupNames];
+    const targetNames = Object.keys(targets);
+    const targetGroup = {
+      name: targetNames.join(','),
+      count: targetNames.length,
+      targets
+    };
+    for (let targetName in targets) {
+      targetGroups[targetName] = targetGroup;
+    }
+  }
+
+  return targetGroups;
+}
+
+/**
+ * Given the low-sec system groups and a lookup map for target null-sec groups,
+ * construct the graph to be used in the visualization.
+ */
+function createGraph(systemGroups, targetGroups) {
+  const nodes = {};
+  const links = {};
+  const graph = {nodes: [], links: []};
+  for (let groupName in systemGroups) {
+    const {targets, count} = systemGroups[groupName];
+    const groupNode = nodes[groupName] = {
+      id: groupName,
+      group: 1,
+      count,
+    };
+    graph.nodes.push(groupNode);
+
+    for (let targetName in targets) {
+      const targetGroup = targetGroups[targetName];
+      if (!(targetGroup.name in nodes)) {
+        const targetNode = nodes[targetGroup.name] = {
+          id: targetGroup.name,
+          group: 0,
+          count: targetGroup.count,
+        };
+        graph.nodes.push(targetNode);
+      }
+
+      const link = `${groupName}~${targetGroup.name}`;
+      if (!(link in links)) {
+        links[link] = true;
+        graph.links.push({source: groupName, target: targetGroup.name});
+      }
+    }
+  }
+
+  return graph;
+}
+
+// Read in the data file and perform all processing.
+fs.readFile(filename, 'utf-8', (err, rawdata) => {
   if (err) {
     throw err;
   }
-  data = rawdata.split('\n').filter(line => /\S/.test(line)).map(JSON.parse);
-  makeNodes();
-  makeEdges();
-  cleanNodes();
-  printJson();
+
+  const systems = parseDataIntoSystems(rawdata);
+
+  const grid = constructGrid(systems);
+
+  const links = findLinks(grid);
+
+  const systemGroups = createSystemGroups(links);
+
+  const targetGroups = combineTargetGroups(systemGroups);
+
+  const graph = createGraph(systemGroups, targetGroups);
+
+  console.log(JSON.stringify(graph));
 });
-
-function makeNodes() {
-  for (var i = 0, leni = data.length; i < leni; i++) {
-    var id = data[i].name;
-    var sec = data[i].securityClass;
-    if (sec === 'high') {
-      var group = 2;
-    } else if (sec === 'low') {
-      group = 1;
-    } else {
-      group = 0;
-    }
-    nodes.push({
-      id: id,
-      group: group
-    });
-    nodes2.push(id);
-  }
-}
-
-function makeEdges() {
-  for (var i = 0, leni = data.length; i < leni; i++) {
-    var inode = nodes[i],
-        idata = data[i];
-    if (inode.group !== 1) {
-      continue;
-    }
-    for (var j = 0, lenj = data.length; j < lenj; j++) {
-      var jnode = nodes[j],
-          jdata = data[j];
-      if (jnode.group !== 0) {
-        continue;
-      }
-      var ix = bigInt(idata.x),
-          iy = bigInt(idata.y),
-          iz = bigInt(idata.z),
-          jx = bigInt(jdata.x),
-          jy = bigInt(jdata.y),
-          jz = bigInt(jdata.z),
-          dx = ix.subtract(jx),
-          dy = iy.subtract(jy),
-          dz = iz.subtract(jz),
-          dx2 = dx.square(),
-          dy2 = dy.square(),
-          dz2 = dz.square(),
-          dist2 = dx2.add(dy2).add(dz2);
-      if (dist2.compare(seven2) === -1) {
-        edges.push({
-          source: inode.id,
-          target: jnode.id,
-          value: 1
-        });
-        found = true;
-        var ii = nodes2.indexOf(inode.id);
-        if (ii !== -1) {
-          nodes2.splice(ii, 1);
-        }
-        ii = nodes2.indexOf(jnode.id);
-        if (ii !== -1) {
-          nodes2.splice(ii, 1);
-        }
-      }
-    }
-  }
-}
-
-function cleanNodes() {
-  nodes = nodes.filter(function(e, i, a) {
-    if (nodes2.indexOf(e.id) !== -1) {
-      return false;
-    }
-    return true;
-  });
-}
-
-function printJson() {
-  var ret = {nodes: nodes, links: edges};
-  console.log(JSON.stringify(ret));
-}
