@@ -2,19 +2,31 @@
 <head>
 <meta charset="utf-8">
 <style>
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
 
 .links line {
-  stroke: #999;
-  stroke-opacity: 0.6;
+  stroke: #444;
+  stroke-opacity: 0.2;
 }
 
 .nodes circle {
-  stroke: #fff;
+  stroke: #666;
   stroke-width: 1.5px;
 }
 
 svg {
+  bottom: 0;
+  display: block;
+  left: 0;
   overflow: visible;
+  position: absolute;
+  right: 0;
+  top: 0;
 }
 
 </style>
@@ -24,19 +36,23 @@ svg {
 <script src="https://d3js.org/d3.v4.min.js"></script>
 <script>
 
-var svg = d3.select("svg"),
-    width = 5000,
-    height = 5000;
+const rect = document.body.getBoundingClientRect();
+
+const svg = d3.select("svg")
+    .attr('width', rect.width)
+    .attr('height', rect.height);
 
 var color = d3.scaleOrdinal(d3.schemeCategory20);
 
 const charge = d3.forceManyBody()
-  .strength(node => -5 * node.count);
+  .strength(node => -1 * node.count);
 
 var simulation = d3.forceSimulation()
     .force("link", d3.forceLink().id(function(d) { return d.id; }))
     .force("charge", charge)
-    .force("center", d3.forceCenter(width / 2, height / 2));
+    .force("center", d3.forceCenter(rect.width / 2, rect.height / 2))
+    .force("x", d3.forceX(rect.width / 2).strength(0.01))
+    .force("y", d3.forceY(rect.height / 2).strength(0.01));
 
 d3.json("eve.json", function(error, graph) {
   if (error) throw error;
@@ -53,8 +69,22 @@ d3.json("eve.json", function(error, graph) {
     .selectAll("circle")
     .data(graph.nodes)
     .enter().append("circle")
-    .attr("r", d => 5 + Math.sqrt(d.count))
+    .attr("r", d => Math.sqrt(d.count))
       .attr("fill", function(d) { return color(d.group); })
+      .on('mouseover', function(d) {
+        const id = d.id;
+        link
+          .filter(d => d.source.id === id || d.target.id === id)
+          .style('stroke', 'red')
+          .style('stroke-opacity', '0.5');
+      })
+      .on('mouseout', function(d) {
+        const id = d.id;
+        link
+          .filter(d => d.source.id === id || d.target.id === id)
+          .style('stroke', null)
+          .style('stroke-opacity', null);
+      })
       .call(d3.drag()
           .on("start", dragstarted)
           .on("drag", dragged)
