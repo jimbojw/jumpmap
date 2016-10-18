@@ -6,7 +6,7 @@
   "scripts": {
     "devserver": "http-server ./web",
     "process": "> ./data/evesystems.ldj ; find ./data/sde/fsd/universe/eve -name 'solarsystem.staticdata' | grep -iv 'uua-f4' | grep -iv 'a821-a' | grep -iv 'j7hz-f' | xargs node ./lib/process.js >> ./data/evesystems.ldj",
-    "process2": "node ./lib/process2.js ./data/evesystems.ldj > ./web/eve.json",
+    "process2": "node ./lib/process2.js ./data/evesystems.ldj | sed -e 's/\\(.\\){/\\1\\n{/g' > ./web/eve.json",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
