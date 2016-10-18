@@ -10,7 +10,7 @@ html, body {
 }
 
 .links line {
-  stroke: #444;
+  stroke: #666;
   stroke-opacity: 0.2;
 }
 
@@ -38,45 +38,53 @@ svg {
 
 const rect = document.body.getBoundingClientRect();
 
-const svg = d3.select("svg")
+const svg = d3.select('svg')
     .attr('width', rect.width)
     .attr('height', rect.height);
 
-var color = d3.scaleOrdinal(d3.schemeCategory20);
+const container = svg.append('g');
 
-const charge = d3.forceManyBody()
-  .strength(node => -1 * node.count);
+const scheme = d3.schemeCategory20c;
+
+const color = d3.scaleOrdinal()
+    .range([scheme[5], scheme[2], scheme[1], scheme[0]])
+    .domain([0, 1, 2, 3]);
 
 var simulation = d3.forceSimulation()
     .force("link", d3.forceLink().id(function(d) { return d.id; }))
-    .force("charge", charge)
+    .force("charge", d3.forceManyBody()
+        .strength(node => -1 * (10 + node.count)))
     .force("center", d3.forceCenter(rect.width / 2, rect.height / 2))
-    .force("x", d3.forceX(rect.width / 2).strength(0.02))
-    .force("y", d3.forceY(rect.height / 2).strength(0.02));
+    .force("x", d3.forceX(rect.width / 2).strength(0.03))
+    .force("y", d3.forceY(rect.height / 2).strength(0.03));
+
+svg.call(d3.zoom()
+    .scaleExtent([0.2, 4])
+    .on('zoom', () => container.attr('transform', d3.event.transform)));
 
 d3.json("eve.json", function(error, graph) {
   if (error) throw error;
 
-  var link = svg.append("g")
+  var link = container.append("g")
       .attr("class", "links")
     .selectAll("line")
     .data(graph.links)
     .enter().append("line")
       .attr("stroke-width", 1);
 
-  var node = svg.append("g")
+  var node = container.append("g")
       .attr("class", "nodes")
     .selectAll("circle")
     .data(graph.nodes)
     .enter().append("circle")
-    .attr("r", d => Math.sqrt(d.count))
-      .attr("fill", function(d) { return color(d.group); })
+    .attr("r", d => 1 + Math.sqrt(d.count))
+    .attr("fill", d => color(d.group))
       .on('mouseover', function(d) {
         const id = d.id;
         link
           .filter(d => d.source.id === id || d.target.id === id)
           .style('stroke', 'red')
-          .style('stroke-opacity', '0.5');
+          .style('stroke-opacity', '0.7');
       })
       .on('mouseout', function(d) {
         const id = d.id;
