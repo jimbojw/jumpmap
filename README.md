@@ -30,7 +30,7 @@ To create this file, use `npm run process`:
 $ npm run process
 
 > jumpmap@0.1.0 process ./jumpmap
-> > ./data/evesystems.ldj ; find ./data/sde/fsd/universe/eve -name 'solarsystem.staticdata' | grep -iv 'uua-f4' | grep -iv 'a821-a' | grep -iv 'j7hz-f' | xargs node ./maptool/process.js >> ./data/evesystems.ldj
+> > ./data/evesystems.ldj ; find ./data/sde/fsd/universe/eve -name 'solarsystem.staticdata' | grep -iv 'uua-f4' | grep -iv 'a821-a' | grep -iv 'j7hz-f' | xargs node ./lib/process.js >> ./data/evesystems.ldj
 
 done processing 1739 systems.
 done processing 1749 systems.
@@ -48,7 +48,7 @@ To create `eve.json`, use `npm run process2`:
 $ npm run process2
 
 > jumpmap@0.1.0 process2 ./jumpmap
-> node ./maptool/process2.js ./data/evesystems.ldj > ./web/eve.json
+> node ./lib/process2.js ./data/evesystems.ldj > ./web/eve.json
 ```
 
 This may take quite a while.
