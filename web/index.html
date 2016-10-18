@@ -51,8 +51,8 @@ var simulation = d3.forceSimulation()
     .force("link", d3.forceLink().id(function(d) { return d.id; }))
     .force("charge", charge)
     .force("center", d3.forceCenter(rect.width / 2, rect.height / 2))
-    .force("x", d3.forceX(rect.width / 2).strength(0.01))
-    .force("y", d3.forceY(rect.height / 2).strength(0.01));
+    .force("x", d3.forceX(rect.width / 2).strength(0.02))
+    .force("y", d3.forceY(rect.height / 2).strength(0.02));
 
 d3.json("eve.json", function(error, graph) {
   if (error) throw error;
