@@ -44,11 +44,7 @@ const svg = d3.select('svg')
 
 const container = svg.append('g');
 
-const scheme = d3.schemeCategory20c;
-
-const color = d3.scaleOrdinal()
-    .range([scheme[5], scheme[2], scheme[1], scheme[0]])
-    .domain([0, 1, 2, 3]);
+const color = d3.scaleOrdinal(d3.schemeCategory20);
 
 var simulation = d3.forceSimulation()
     .force("link", d3.forceLink().id(function(d) { return d.id; }))
@@ -78,7 +74,7 @@ d3.json("eve.json", function(error, graph) {
     .data(graph.nodes)
     .enter().append("circle")
     .attr("r", d => 1 + Math.sqrt(d.count))
-    .attr("fill", d => color(d.group))
+    .attr("fill", d => d.region ? color(d.region) : '#ccc')
       .on('mouseover', function(d) {
         const id = d.id;
         link
@@ -98,7 +94,7 @@ d3.json("eve.json", function(error, graph) {
           .on("drag", dragged)
           .on("end", dragended));
 
-  node.append("title").text(d => d.id);
+  node.append("title").text(d => d.name);
 
   simulation
       .nodes(graph.nodes)
