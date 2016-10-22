@@ -11,13 +11,13 @@ const color = d3.scaleOrdinal(d3.schemeCategory20);
 var simulation = d3.forceSimulation()
     .force("link", d3.forceLink().id(function(d) { return d.id; }))
     .force("charge", d3.forceManyBody()
-        .strength(node => -1 * (10 + node.count)))
+        .strength(node => node.region ? -500 : -2 * (10 + node.count)))
     .force("center", d3.forceCenter(rect.width / 2, rect.height / 2))
     .force("x", d3.forceX(rect.width / 2).strength(0.03))
     .force("y", d3.forceY(rect.height / 2).strength(0.03));
 
 svg.call(d3.zoom()
-    .scaleExtent([0.2, 4])
+    .scaleExtent([0.2, 8])
     .on('zoom', () => container.attr('transform', d3.event.transform)));
 
 d3.json("eve.json", function(error, graph) {
@@ -35,7 +35,7 @@ d3.json("eve.json", function(error, graph) {
     .selectAll("circle")
     .data(graph.nodes)
     .enter().append("circle")
-    .attr("r", d => 1 + Math.sqrt(d.count))
+    .attr("r", d => 2 * (1 + Math.sqrt(d.count)))
     .attr("fill", d => d.region ? color(d.region) : '#ccc')
       .on('mouseover', function(d) {
         const id = d.id;
