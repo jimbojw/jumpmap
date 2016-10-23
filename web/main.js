@@ -9,12 +9,13 @@ const container = svg.append('g');
 const color = d3.scaleOrdinal(d3.schemeCategory20);
 
 var simulation = d3.forceSimulation()
-    .force("link", d3.forceLink().id(function(d) { return d.id; }))
+    .force("link", d3.forceLink().id(d => d.id)
+        .distance(link => 100))
     .force("charge", d3.forceManyBody()
-        .strength(node => node.region ? -500 : -2 * (10 + node.count)))
+        .strength(node => (node.region ? -0.05 : -0.3) * (10 + node.count)))
     .force("center", d3.forceCenter(rect.width / 2, rect.height / 2))
-    .force("x", d3.forceX(rect.width / 2).strength(0.03))
-    .force("y", d3.forceY(rect.height / 2).strength(0.03));
+    .force("x", d3.forceX(rect.width / 2).strength(0.02))
+    .force("y", d3.forceY(rect.height / 2).strength(0.02));
 
 svg.call(d3.zoom()
     .scaleExtent([0.2, 8])
@@ -22,6 +23,28 @@ svg.call(d3.zoom()
 
 d3.json("eve.json", function(error, graph) {
   if (error) throw error;
+
+  // Compute extent of graph.
+  let minx = Infinity;
+  let maxx = -Infinity;
+  let minz = Infinity;
+  let maxz = -Infinity;
+  graph.nodes.forEach(node => {
+    minx = Math.min(minx, node.center.x);
+    maxx = Math.max(maxx, node.center.x);
+    minz = Math.min(minz, node.center.z);
+    maxz = Math.max(maxz, node.center.z);
+  });
+
+  // Create scales that convert world xz into screen xy.
+  const scaleX = d3.scaleLinear().domain([minx, maxx]).range([0, rect.width]);
+  const scaleY = d3.scaleLinear().domain([minz, maxz]).range([rect.height, 0]);
+
+  // Set initial positions in screen pixels.
+  graph.nodes.forEach(node => {
+    node.x = scaleX(node.center.x);
+    node.y = scaleY(node.center.z);
+  });
 
   var link = container.append("g")
       .attr("class", "links")
@@ -35,13 +58,14 @@ d3.json("eve.json", function(error, graph) {
     .selectAll("circle")
     .data(graph.nodes)
     .enter().append("circle")
-    .attr("r", d => 2 * (1 + Math.sqrt(d.count)))
+    .attr("r", d => 1 + Math.sqrt(d.count))
     .attr("fill", d => d.region ? color(d.region) : '#ccc')
       .on('mouseover', function(d) {
         const id = d.id;
         link
           .filter(d => d.source.id === id || d.target.id === id)
           .style('stroke', 'red')
+          .style('stroke-width', '0.5px')
           .style('stroke-opacity', '0.7');
       })
       .on('mouseout', function(d) {
@@ -49,6 +73,7 @@ d3.json("eve.json", function(error, graph) {
         link
           .filter(d => d.source.id === id || d.target.id === id)
           .style('stroke', null)
+          .style('stroke-width', null)
           .style('stroke-opacity', null);
       })
       .call(d3.drag()
